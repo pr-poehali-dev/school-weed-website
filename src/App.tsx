@@ -1,28 +1,31 @@
-
+import { useState } from "react";
 import { Toaster } from "@/components/ui/toaster";
-import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
-import Index from "./pages/Index";
-import NotFound from "./pages/NotFound";
+import Navigation from "./components/Navigation";
+import HeroSection from "./components/HeroSection";
+import CatalogSection from "./components/CatalogSection";
+import GallerySection from "./components/GallerySection";
+import QuizSection from "./components/QuizSection";
 
-const queryClient = new QueryClient();
+export type Section = "home" | "catalog" | "gallery" | "quiz";
 
-const App = () => (
-  <QueryClientProvider client={queryClient}>
+const App = () => {
+  const [activeSection, setActiveSection] = useState<Section>("home");
+
+  return (
     <TooltipProvider>
       <Toaster />
-      <Sonner />
-      <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<Index />} />
-          {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-          <Route path="*" element={<NotFound />} />
-        </Routes>
-      </BrowserRouter>
+      <div className="min-h-screen bg-background">
+        <Navigation activeSection={activeSection} setActiveSection={setActiveSection} />
+        <main>
+          {activeSection === "home" && <HeroSection setActiveSection={setActiveSection} />}
+          {activeSection === "catalog" && <CatalogSection />}
+          {activeSection === "gallery" && <GallerySection />}
+          {activeSection === "quiz" && <QuizSection />}
+        </main>
+      </div>
     </TooltipProvider>
-  </QueryClientProvider>
-);
+  );
+};
 
 export default App;

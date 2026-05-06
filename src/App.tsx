@@ -1,27 +1,27 @@
 import { useState } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import Navigation from "./components/Navigation";
-import HeroSection from "./components/HeroSection";
-import CatalogSection from "./components/CatalogSection";
-import GallerySection from "./components/GallerySection";
-import QuizSection from "./components/QuizSection";
+import FarmNavigation from "./components/FarmNavigation";
+import FarmHero from "./components/FarmHero";
+import FarmDashboard from "./components/FarmDashboard";
+import FarmCatalog from "./components/FarmCatalog";
+import FarmStaff from "./components/FarmStaff";
 
-export type Section = "home" | "catalog" | "gallery" | "quiz";
+export type FarmSection = "home" | "dashboard" | "catalog" | "staff";
 
 const App = () => {
-  const [activeSection, setActiveSection] = useState<Section>("home");
+  const [activeSection, setActiveSection] = useState<FarmSection>("home");
 
   return (
     <TooltipProvider>
       <Toaster />
       <div className="min-h-screen bg-background">
-        <Navigation activeSection={activeSection} setActiveSection={setActiveSection} />
+        <FarmNavigation activeSection={activeSection} setActiveSection={setActiveSection} />
         <main>
-          {activeSection === "home" && <HeroSection setActiveSection={setActiveSection} />}
-          {activeSection === "catalog" && <CatalogSection />}
-          {activeSection === "gallery" && <GallerySection />}
-          {activeSection === "quiz" && <QuizSection />}
+          {activeSection === "home" && <FarmHero setActiveSection={setActiveSection} />}
+          {activeSection === "dashboard" && <FarmDashboard />}
+          {activeSection === "catalog" && <FarmCatalog />}
+          {activeSection === "staff" && <FarmStaff />}
         </main>
       </div>
     </TooltipProvider>

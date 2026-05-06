@@ -19,8 +19,8 @@ export default {
 		},
 		extend: {
 			fontFamily: {
-				display: ['Cormorant', 'serif'],
-				body: ['Golos Text', 'sans-serif'],
+				display: ['Merriweather', 'serif'],
+				body: ['Montserrat', 'sans-serif'],
 			},
 			colors: {
 				border: 'hsl(var(--border))',
@@ -56,13 +56,14 @@ export default {
 					DEFAULT: 'hsl(var(--card))',
 					foreground: 'hsl(var(--card-foreground))'
 				},
-				herb: {
-					dark: 'hsl(var(--herb-dark))',
-					mid: 'hsl(var(--herb-mid))',
-					light: 'hsl(var(--herb-light))',
-					pale: 'hsl(var(--herb-pale))',
-					cream: 'hsl(var(--herb-cream))',
-					gold: 'hsl(var(--herb-gold))',
+				farm: {
+					earth: 'hsl(var(--farm-earth))',
+					brown: 'hsl(var(--farm-brown))',
+					amber: 'hsl(var(--farm-amber))',
+					wheat: 'hsl(var(--farm-wheat))',
+					cream: 'hsl(var(--farm-cream))',
+					green: 'hsl(var(--farm-green))',
+					sky: 'hsl(var(--farm-sky))',
 				}
 			},
 			borderRadius: {

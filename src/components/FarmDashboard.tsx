@@ -3,6 +3,7 @@ import Icon from "@/components/ui/icon";
 
 const STATS_URL = "https://functions.poehali.dev/3edca9be-45bb-4425-80dd-ea21bcc88f24";
 const TASKS_URL = "https://functions.poehali.dev/08c4aa1f-ceea-4a1e-b7de-6e95337f3082";
+const CROPS_URL = "https://functions.poehali.dev/58c3ced7-caaf-471c-8d30-88e90e871539";
 
 interface StatItem {
   key: string;
@@ -20,6 +21,15 @@ interface Task {
   done: boolean;
 }
 
+interface Crop {
+  id: number;
+  name: string;
+  area: number;
+  progress: number;
+  stage: string;
+  icon: string;
+}
+
 const statMeta: Record<string, { icon: string; color: string; change: string; placeholder: string }> = {
   hectares: { icon: "Map", color: "text-amber-600 bg-amber-50", change: "+5% к прошлому году", placeholder: "1240" },
   employees: { icon: "Users", color: "text-blue-600 bg-blue-50", change: "+2 к прошлому году", placeholder: "48" },
@@ -27,12 +37,8 @@ const statMeta: Record<string, { icon: string; color: string; change: string; pl
   machines: { icon: "Tractor", color: "text-farm-brown bg-orange-50", change: "единиц техники", placeholder: "7" },
 };
 
-const crops = [
-  { name: "Пшеница озимая", area: 480, progress: 75, stage: "Колошение", icon: "🌾" },
-  { name: "Подсолнечник", area: 320, progress: 45, stage: "Рост", icon: "🌻" },
-  { name: "Кукуруза", area: 250, progress: 30, stage: "Всходы", icon: "🌽" },
-  { name: "Ячмень", area: 190, progress: 85, stage: "Восковая спелость", icon: "🌿" },
-];
+const CROP_ICONS = ["🌾", "🌻", "🌽", "🌿", "🌱", "🫛", "🟣", "🫚", "🍃", "🌰"];
+const emptyCrop = { name: "", area: 0, progress: 0, stage: "", icon: "🌾" };
 
 
 
@@ -62,9 +68,18 @@ export default function FarmDashboard() {
   const [addOpen, setAddOpen] = useState(false);
   const [taskSaving, setTaskSaving] = useState(false);
 
+  // Crops state
+  const [crops, setCrops] = useState<Crop[]>([]);
+  const [cropsLoading, setCropsLoading] = useState(true);
+  const [cropForm, setCropForm] = useState<typeof emptyCrop>(emptyCrop);
+  const [editCrop, setEditCrop] = useState<Crop | null>(null);
+  const [cropSaving, setCropSaving] = useState(false);
+  const [cropModalOpen, setCropModalOpen] = useState(false);
+
   useEffect(() => {
     fetchStats();
     fetchTasks();
+    fetchCrops();
   }, []);
 
   async function fetchStats() {
@@ -76,6 +91,56 @@ export default function FarmDashboard() {
     data.stats.forEach((s: StatItem) => { vals[s.key] = s.value; });
     setEditValues(vals);
     setStatsLoading(false);
+  }
+
+  async function fetchCrops() {
+    setCropsLoading(true);
+    const res = await fetch(CROPS_URL);
+    const data = await res.json();
+    setCrops(data.crops);
+    setCropsLoading(false);
+  }
+
+  async function handleSaveCrop() {
+    setCropSaving(true);
+    if (editCrop) {
+      await fetch(CROPS_URL, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...editCrop, ...cropForm }),
+      });
+      showSaved("Посев обновлён!");
+    } else {
+      await fetch(CROPS_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(cropForm),
+      });
+      showSaved("Посев добавлен!");
+    }
+    await fetchCrops();
+    setCropSaving(false);
+    setCropModalOpen(false);
+    setEditCrop(null);
+    setCropForm(emptyCrop);
+  }
+
+  async function handleDeleteCrop(id: number) {
+    await fetch(`${CROPS_URL}?id=${id}`, { method: "DELETE" });
+    setCrops(prev => prev.filter(c => c.id !== id));
+    showSaved("Посев удалён");
+  }
+
+  function openEditCrop(crop: Crop) {
+    setEditCrop(crop);
+    setCropForm({ name: crop.name, area: crop.area, progress: crop.progress, stage: crop.stage, icon: crop.icon });
+    setCropModalOpen(true);
+  }
+
+  function openAddCrop() {
+    setEditCrop(null);
+    setCropForm(emptyCrop);
+    setCropModalOpen(true);
   }
 
   async function fetchTasks() {
@@ -217,13 +282,31 @@ export default function FarmDashboard() {
 
         {/* Crops */}
         <div className="bg-card border border-border rounded-2xl p-6">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="font-display text-xl font-bold text-farm-earth">Текущие посевы</h2>
-              <span className="font-body text-xs text-muted-foreground">Сезон 2026</span>
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="font-display text-xl font-bold text-farm-earth">Текущие посевы</h2>
+            <button
+              onClick={openAddCrop}
+              className="flex items-center gap-2 bg-farm-brown text-white font-body font-bold px-4 py-2 rounded-xl hover:bg-farm-earth transition-colors text-sm"
+            >
+              <Icon name="Plus" size={16} />
+              Добавить
+            </button>
+          </div>
+          {cropsLoading ? (
+            <div className="space-y-5">
+              {Array.from({ length: 3 }).map((_, i) => (
+                <div key={i} className="h-12 bg-muted rounded-xl animate-pulse" />
+              ))}
             </div>
+          ) : crops.length === 0 ? (
+            <div className="text-center py-10 text-muted-foreground">
+              <span className="text-4xl block mb-3">🌱</span>
+              <p className="font-body text-sm">Посевов пока нет. Добавьте первый!</p>
+            </div>
+          ) : (
             <div className="space-y-5">
               {crops.map((c) => (
-                <div key={c.name}>
+                <div key={c.id} className="group">
                   <div className="flex items-center justify-between mb-2">
                     <div className="flex items-center gap-2">
                       <span className="text-xl">{c.icon}</span>
@@ -232,7 +315,23 @@ export default function FarmDashboard() {
                         <p className="font-body text-xs text-muted-foreground">{c.stage} · {c.area} га</p>
                       </div>
                     </div>
-                    <span className="font-body text-sm font-bold text-farm-brown">{c.progress}%</span>
+                    <div className="flex items-center gap-2">
+                      <span className="font-body text-sm font-bold text-farm-brown">{c.progress}%</span>
+                      <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <button
+                          onClick={() => openEditCrop(c)}
+                          className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+                        >
+                          <Icon name="Pencil" size={14} />
+                        </button>
+                        <button
+                          onClick={() => handleDeleteCrop(c.id)}
+                          className="p-1.5 rounded-lg hover:bg-red-50 text-muted-foreground hover:text-red-600 transition-colors"
+                        >
+                          <Icon name="Trash2" size={14} />
+                        </button>
+                      </div>
+                    </div>
                   </div>
                   <div className="h-2 bg-muted rounded-full overflow-hidden">
                     <div
@@ -243,6 +342,7 @@ export default function FarmDashboard() {
                 </div>
               ))}
             </div>
+          )}
         </div>
 
         {/* Tasks */}
@@ -449,6 +549,99 @@ export default function FarmDashboard() {
                 >
                   {taskSaving ? <Icon name="Loader2" size={16} className="animate-spin" /> : <Icon name="Save" size={16} />}
                   {taskSaving ? "Сохранение..." : "Сохранить"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Crop add/edit modal */}
+      {cropModalOpen && (
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => { setCropModalOpen(false); setEditCrop(null); }}>
+          <div className="bg-card rounded-3xl max-w-md w-full shadow-2xl" onClick={e => e.stopPropagation()}>
+            <div className="farm-gradient p-6 rounded-t-3xl flex items-center justify-between">
+              <div>
+                <h2 className="font-display text-xl font-bold text-white">
+                  {editCrop ? "Редактировать посев" : "Новый посев"}
+                </h2>
+                <p className="font-body text-sm text-white/60 mt-0.5">Заполните поля ниже</p>
+              </div>
+              <button onClick={() => { setCropModalOpen(false); setEditCrop(null); }} className="text-white/60 hover:text-white">
+                <Icon name="X" size={20} />
+              </button>
+            </div>
+            <div className="p-6 space-y-4">
+              <div>
+                <label className="font-body text-sm font-semibold text-foreground mb-1.5 block">Значок</label>
+                <div className="flex flex-wrap gap-2">
+                  {CROP_ICONS.map(ic => (
+                    <button
+                      key={ic}
+                      onClick={() => setCropForm(p => ({ ...p, icon: ic }))}
+                      className={`w-10 h-10 rounded-xl text-xl flex items-center justify-center transition-colors ${
+                        cropForm.icon === ic ? "bg-farm-amber border-2 border-farm-brown" : "bg-muted hover:bg-farm-cream border-2 border-transparent"
+                      }`}
+                    >
+                      {ic}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <label className="font-body text-sm font-semibold text-foreground mb-1.5 block">Культура *</label>
+                <input
+                  type="text"
+                  value={cropForm.name}
+                  onChange={e => setCropForm(p => ({ ...p, name: e.target.value }))}
+                  placeholder="Пшеница озимая"
+                  className="w-full border border-border rounded-xl px-4 py-2.5 font-body text-sm focus:outline-none bg-background focus:border-farm-brown"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="font-body text-sm font-semibold text-foreground mb-1.5 block">Площадь (га)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={cropForm.area}
+                    onChange={e => setCropForm(p => ({ ...p, area: Number(e.target.value) }))}
+                    className="w-full border border-border rounded-xl px-4 py-2.5 font-body text-sm focus:outline-none bg-background focus:border-farm-brown"
+                  />
+                </div>
+                <div>
+                  <label className="font-body text-sm font-semibold text-foreground mb-1.5 block">Прогресс (%)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    max="100"
+                    value={cropForm.progress}
+                    onChange={e => setCropForm(p => ({ ...p, progress: Math.min(100, Number(e.target.value)) }))}
+                    className="w-full border border-border rounded-xl px-4 py-2.5 font-body text-sm focus:outline-none bg-background focus:border-farm-brown"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="font-body text-sm font-semibold text-foreground mb-1.5 block">Стадия</label>
+                <input
+                  type="text"
+                  value={cropForm.stage}
+                  onChange={e => setCropForm(p => ({ ...p, stage: e.target.value }))}
+                  placeholder="Колошение / Рост / Всходы"
+                  className="w-full border border-border rounded-xl px-4 py-2.5 font-body text-sm focus:outline-none bg-background focus:border-farm-brown"
+                />
+              </div>
+              <div className="flex gap-3 pt-2">
+                <button onClick={() => { setCropModalOpen(false); setEditCrop(null); }} className="flex-1 py-3 rounded-xl font-body font-semibold text-sm border border-border hover:bg-muted transition-colors">
+                  Отмена
+                </button>
+                <button
+                  onClick={handleSaveCrop}
+                  disabled={cropSaving || !cropForm.name.trim()}
+                  className="flex-1 py-3 rounded-xl font-body font-bold text-sm bg-farm-brown text-white hover:bg-farm-earth transition-colors flex items-center justify-center gap-2 disabled:opacity-60"
+                >
+                  {cropSaving ? <Icon name="Loader2" size={16} className="animate-spin" /> : <Icon name="Save" size={16} />}
+                  {cropSaving ? "Сохранение..." : "Сохранить"}
                 </button>
               </div>
             </div>

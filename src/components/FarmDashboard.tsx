@@ -34,13 +34,7 @@ const crops = [
   { name: "Ячмень", area: 190, progress: 85, stage: "Восковая спелость", icon: "🌿" },
 ];
 
-const weather = [
-  { day: "Сегодня", icon: "☀️", temp: "+18°", desc: "Ясно" },
-  { day: "Завтра", icon: "⛅", temp: "+15°", desc: "Облачно" },
-  { day: "Среда", icon: "🌧️", temp: "+12°", desc: "Дождь" },
-  { day: "Четверг", icon: "🌤️", temp: "+17°", desc: "Переменно" },
-  { day: "Пятница", icon: "☀️", temp: "+20°", desc: "Ясно" },
-];
+
 
 const priorityStyles: Record<string, string> = {
   high: "bg-red-100 text-red-700",
@@ -224,9 +218,8 @@ export default function FarmDashboard() {
               })}
         </div>
 
-        {/* Crops + Weather */}
-        <div className="grid lg:grid-cols-3 gap-6">
-          <div className="lg:col-span-2 bg-card border border-border rounded-2xl p-6">
+        {/* Crops */}
+        <div className="bg-card border border-border rounded-2xl p-6">
             <div className="flex items-center justify-between mb-6">
               <h2 className="font-display text-xl font-bold text-farm-earth">Текущие посевы</h2>
               <span className="font-body text-xs text-muted-foreground">Сезон 2026</span>
@@ -253,25 +246,6 @@ export default function FarmDashboard() {
                 </div>
               ))}
             </div>
-          </div>
-
-          <div className="bg-card border border-border rounded-2xl p-6">
-            <h2 className="font-display text-xl font-bold text-farm-earth mb-6">Погода</h2>
-            <div className="space-y-3">
-              {weather.map((w, i) => (
-                <div key={w.day} className={`flex items-center justify-between p-3 rounded-xl ${i === 0 ? "bg-farm-cream" : ""}`}>
-                  <div className="flex items-center gap-3">
-                    <span className="text-xl">{w.icon}</span>
-                    <div>
-                      <p className="font-body text-sm font-semibold">{w.day}</p>
-                      <p className="font-body text-xs text-muted-foreground">{w.desc}</p>
-                    </div>
-                  </div>
-                  <span className="font-display text-lg font-bold text-farm-earth">{w.temp}</span>
-                </div>
-              ))}
-            </div>
-          </div>
         </div>
 
         {/* Tasks */}

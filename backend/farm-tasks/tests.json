@@ -1,0 +1,12 @@
+{
+  "tests": [
+    {
+      "name": "GET tasks",
+      "method": "GET",
+      "path": "/",
+      "expectedStatus": 200,
+      "expectedBody": {"tasks": [{"id": 1}]},
+      "bodyMatcher": "partial"
+    }
+  ]
+}

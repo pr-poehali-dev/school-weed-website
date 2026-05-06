@@ -1,7 +1,8 @@
 import { useState, useEffect } from "react";
 import Icon from "@/components/ui/icon";
 
-const API_URL = "https://functions.poehali.dev/3edca9be-45bb-4425-80dd-ea21bcc88f24";
+const STATS_URL = "https://functions.poehali.dev/3edca9be-45bb-4425-80dd-ea21bcc88f24";
+const TASKS_URL = "https://functions.poehali.dev/08c4aa1f-ceea-4a1e-b7de-6e95337f3082";
 
 interface StatItem {
   key: string;
@@ -10,20 +11,21 @@ interface StatItem {
   unit: string;
 }
 
+interface Task {
+  id: number;
+  title: string;
+  assignee: string;
+  due: string;
+  priority: string;
+  done: boolean;
+}
+
 const statMeta: Record<string, { icon: string; color: string; change: string; placeholder: string }> = {
   hectares: { icon: "Map", color: "text-amber-600 bg-amber-50", change: "+5% к прошлому году", placeholder: "1240" },
   employees: { icon: "Users", color: "text-blue-600 bg-blue-50", change: "+2 к прошлому году", placeholder: "48" },
   harvest: { icon: "Package", color: "text-green-600 bg-green-50", change: "+12% к прошлому году", placeholder: "860" },
   machines: { icon: "Tractor", color: "text-farm-brown bg-orange-50", change: "единиц техники", placeholder: "7" },
 };
-
-const tasks = [
-  { title: "Опрыскивание поля №3", assignee: "Иванов А.", due: "Сегодня", priority: "high", done: false },
-  { title: "ТО трактора Беларус 82", assignee: "Петров Д.", due: "Завтра", priority: "medium", done: false },
-  { title: "Инвентаризация склада", assignee: "Сидорова Н.", due: "15 мая", priority: "low", done: false },
-  { title: "Сортировка семян кукурузы", assignee: "Козлов В.", due: "12 мая", priority: "medium", done: true },
-  { title: "Ремонт ирригации поля №1", assignee: "Михайлов С.", due: "11 мая", priority: "high", done: true },
-];
 
 const crops = [
   { name: "Пшеница озимая", area: 480, progress: 75, stage: "Колошение", icon: "🌾" },
@@ -47,46 +49,121 @@ const priorityStyles: Record<string, string> = {
 };
 const priorityLabels: Record<string, string> = { high: "Срочно", medium: "Средний", low: "Низкий" };
 
+const emptyTask = { title: "", assignee: "", due: "", priority: "medium" };
+
 export default function FarmDashboard() {
+  // Stats state
   const [stats, setStats] = useState<StatItem[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [editOpen, setEditOpen] = useState(false);
+  const [statsLoading, setStatsLoading] = useState(true);
+  const [editStatsOpen, setEditStatsOpen] = useState(false);
   const [editValues, setEditValues] = useState<Record<string, string>>({});
-  const [saving, setSaving] = useState(false);
-  const [savedMsg, setSavedMsg] = useState(false);
+  const [statsSaving, setStatsSaving] = useState(false);
+  const [savedMsg, setSavedMsg] = useState("");
+
+  // Tasks state
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [tasksLoading, setTasksLoading] = useState(true);
+  const [taskForm, setTaskForm] = useState(emptyTask);
+  const [editTask, setEditTask] = useState<Task | null>(null);
+  const [addOpen, setAddOpen] = useState(false);
+  const [taskSaving, setTaskSaving] = useState(false);
 
   useEffect(() => {
     fetchStats();
+    fetchTasks();
   }, []);
 
   async function fetchStats() {
-    setLoading(true);
-    const res = await fetch(API_URL);
+    setStatsLoading(true);
+    const res = await fetch(STATS_URL);
     const data = await res.json();
     setStats(data.stats);
     const vals: Record<string, string> = {};
     data.stats.forEach((s: StatItem) => { vals[s.key] = s.value; });
     setEditValues(vals);
-    setLoading(false);
+    setStatsLoading(false);
   }
 
-  async function handleSave() {
-    setSaving(true);
+  async function fetchTasks() {
+    setTasksLoading(true);
+    const res = await fetch(TASKS_URL);
+    const data = await res.json();
+    setTasks(data.tasks);
+    setTasksLoading(false);
+  }
+
+  async function handleSaveStats() {
+    setStatsSaving(true);
     const updates = Object.entries(editValues).map(([key, value]) => ({ key, value }));
-    await fetch(API_URL, {
+    await fetch(STATS_URL, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ updates }),
     });
     await fetchStats();
-    setSaving(false);
-    setEditOpen(false);
-    setSavedMsg(true);
-    setTimeout(() => setSavedMsg(false), 2500);
+    setStatsSaving(false);
+    setEditStatsOpen(false);
+    showSaved("Показатели сохранены!");
+  }
+
+  async function handleToggleDone(task: Task) {
+    await fetch(TASKS_URL, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ...task, done: !task.done }),
+    });
+    setTasks(prev => prev.map(t => t.id === task.id ? { ...t, done: !t.done } : t));
+  }
+
+  async function handleDeleteTask(id: number) {
+    await fetch(`${TASKS_URL}?id=${id}`, { method: "DELETE" });
+    setTasks(prev => prev.filter(t => t.id !== id));
+  }
+
+  async function handleSaveTask() {
+    setTaskSaving(true);
+    if (editTask) {
+      await fetch(TASKS_URL, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...editTask, ...taskForm }),
+      });
+      showSaved("Задача обновлена!");
+    } else {
+      await fetch(TASKS_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(taskForm),
+      });
+      showSaved("Задача добавлена!");
+    }
+    await fetchTasks();
+    setTaskSaving(false);
+    setAddOpen(false);
+    setEditTask(null);
+    setTaskForm(emptyTask);
+  }
+
+  function openEdit(task: Task) {
+    setEditTask(task);
+    setTaskForm({ title: task.title, assignee: task.assignee, due: task.due, priority: task.priority });
+    setAddOpen(true);
+  }
+
+  function openAdd() {
+    setEditTask(null);
+    setTaskForm(emptyTask);
+    setAddOpen(true);
+  }
+
+  function showSaved(msg: string) {
+    setSavedMsg(msg);
+    setTimeout(() => setSavedMsg(""), 2500);
   }
 
   return (
     <div className="pt-16 min-h-screen bg-background">
+      {/* Header */}
       <div className="farm-gradient py-10 px-6">
         <div className="container mx-auto">
           <div className="flex items-center justify-between">
@@ -100,28 +177,29 @@ export default function FarmDashboard() {
                 <span className="font-body text-sm text-white">ООО «Агро-Юг», Краснодарский край</span>
               </div>
               <button
-                onClick={() => setEditOpen(true)}
+                onClick={() => setEditStatsOpen(true)}
                 className="flex items-center gap-2 bg-farm-wheat text-farm-earth font-body font-bold px-4 py-2 rounded-xl hover:bg-yellow-300 transition-colors text-sm"
               >
                 <Icon name="Pencil" size={15} />
-                Изменить показатели
+                <span className="hidden sm:inline">Изменить показатели</span>
               </button>
             </div>
           </div>
         </div>
       </div>
 
+      {/* Toast */}
       {savedMsg && (
-        <div className="fixed top-20 right-6 z-50 bg-green-600 text-white font-body text-sm font-semibold px-5 py-3 rounded-xl shadow-lg flex items-center gap-2 animate-fade-up">
+        <div className="fixed top-20 right-6 z-50 bg-green-600 text-white font-body text-sm font-semibold px-5 py-3 rounded-xl shadow-lg flex items-center gap-2">
           <Icon name="CheckCircle" size={16} />
-          Показатели сохранены!
+          {savedMsg}
         </div>
       )}
 
       <div className="container mx-auto px-6 py-8 space-y-8">
         {/* Stats */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          {loading
+          {statsLoading
             ? Array.from({ length: 4 }).map((_, i) => (
                 <div key={i} className="bg-card border border-border rounded-2xl p-5 animate-pulse">
                   <div className="w-10 h-10 bg-muted rounded-xl mb-4" />
@@ -146,8 +224,8 @@ export default function FarmDashboard() {
               })}
         </div>
 
+        {/* Crops + Weather */}
         <div className="grid lg:grid-cols-3 gap-6">
-          {/* Crops progress */}
           <div className="lg:col-span-2 bg-card border border-border rounded-2xl p-6">
             <div className="flex items-center justify-between mb-6">
               <h2 className="font-display text-xl font-bold text-farm-earth">Текущие посевы</h2>
@@ -177,7 +255,6 @@ export default function FarmDashboard() {
             </div>
           </div>
 
-          {/* Weather */}
           <div className="bg-card border border-border rounded-2xl p-6">
             <h2 className="font-display text-xl font-bold text-farm-earth mb-6">Погода</h2>
             <div className="space-y-3">
@@ -200,55 +277,100 @@ export default function FarmDashboard() {
         {/* Tasks */}
         <div className="bg-card border border-border rounded-2xl p-6">
           <div className="flex items-center justify-between mb-6">
-            <h2 className="font-display text-xl font-bold text-farm-earth">Задачи</h2>
-            <span className="font-body text-xs text-muted-foreground">
-              {tasks.filter(t => !t.done).length} активных
-            </span>
+            <div>
+              <h2 className="font-display text-xl font-bold text-farm-earth">Задачи</h2>
+              {!tasksLoading && (
+                <p className="font-body text-xs text-muted-foreground mt-0.5">
+                  {tasks.filter(t => !t.done).length} активных · {tasks.filter(t => t.done).length} выполнено
+                </p>
+              )}
+            </div>
+            <button
+              onClick={openAdd}
+              className="flex items-center gap-2 bg-farm-brown text-white font-body font-bold px-4 py-2 rounded-xl hover:bg-farm-earth transition-colors text-sm"
+            >
+              <Icon name="Plus" size={16} />
+              Добавить
+            </button>
           </div>
-          <div className="space-y-3">
-            {tasks.map((task, i) => (
-              <div
-                key={i}
-                className={`flex items-center gap-4 p-4 rounded-xl border transition-colors ${
-                  task.done ? "bg-muted/50 border-border opacity-60" : "bg-background border-border hover:border-farm-amber"
-                }`}
-              >
-                <div className={`w-5 h-5 rounded-full border-2 flex-shrink-0 flex items-center justify-center ${
-                  task.done ? "bg-farm-green border-farm-green" : "border-muted-foreground"
-                }`}>
-                  {task.done && <Icon name="Check" size={10} className="text-white" />}
+
+          {tasksLoading ? (
+            <div className="space-y-3">
+              {Array.from({ length: 3 }).map((_, i) => (
+                <div key={i} className="h-16 bg-muted rounded-xl animate-pulse" />
+              ))}
+            </div>
+          ) : tasks.length === 0 ? (
+            <div className="text-center py-10 text-muted-foreground">
+              <Icon name="ClipboardList" size={40} className="mx-auto mb-3 opacity-30" />
+              <p className="font-body text-sm">Задач пока нет. Добавьте первую!</p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {tasks.map((task) => (
+                <div
+                  key={task.id}
+                  className={`flex items-center gap-4 p-4 rounded-xl border transition-colors group ${
+                    task.done ? "bg-muted/40 border-border opacity-60" : "bg-background border-border hover:border-farm-amber"
+                  }`}
+                >
+                  <button
+                    onClick={() => handleToggleDone(task)}
+                    className={`w-5 h-5 rounded-full border-2 flex-shrink-0 flex items-center justify-center transition-colors ${
+                      task.done ? "bg-farm-green border-farm-green" : "border-muted-foreground hover:border-farm-green"
+                    }`}
+                  >
+                    {task.done && <Icon name="Check" size={10} className="text-white" />}
+                  </button>
+                  <div className="flex-1 min-w-0">
+                    <p className={`font-body text-sm font-medium ${task.done ? "line-through text-muted-foreground" : "text-foreground"}`}>
+                      {task.title}
+                    </p>
+                    <p className="font-body text-xs text-muted-foreground">
+                      {task.assignee && <span>{task.assignee}</span>}
+                      {task.assignee && task.due && <span> · </span>}
+                      {task.due && <span>{task.due}</span>}
+                    </p>
+                  </div>
+                  {!task.done && (
+                    <span className={`font-body text-xs font-semibold px-2.5 py-1 rounded-full flex-shrink-0 ${priorityStyles[task.priority]}`}>
+                      {priorityLabels[task.priority]}
+                    </span>
+                  )}
+                  <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <button
+                      onClick={() => openEdit(task)}
+                      className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+                    >
+                      <Icon name="Pencil" size={14} />
+                    </button>
+                    <button
+                      onClick={() => handleDeleteTask(task.id)}
+                      className="p-1.5 rounded-lg hover:bg-red-50 text-muted-foreground hover:text-red-600 transition-colors"
+                    >
+                      <Icon name="Trash2" size={14} />
+                    </button>
+                  </div>
                 </div>
-                <div className="flex-1 min-w-0">
-                  <p className={`font-body text-sm font-medium ${task.done ? "line-through text-muted-foreground" : "text-foreground"}`}>
-                    {task.title}
-                  </p>
-                  <p className="font-body text-xs text-muted-foreground">{task.assignee} · {task.due}</p>
-                </div>
-                {!task.done && (
-                  <span className={`font-body text-xs font-semibold px-2.5 py-1 rounded-full flex-shrink-0 ${priorityStyles[task.priority]}`}>
-                    {priorityLabels[task.priority]}
-                  </span>
-                )}
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 
-      {/* Edit modal */}
-      {editOpen && (
-        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setEditOpen(false)}>
+      {/* Stats edit modal */}
+      {editStatsOpen && (
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setEditStatsOpen(false)}>
           <div className="bg-card rounded-3xl max-w-md w-full shadow-2xl" onClick={e => e.stopPropagation()}>
             <div className="farm-gradient p-6 rounded-t-3xl flex items-center justify-between">
               <div>
                 <h2 className="font-display text-xl font-bold text-white">Общие показатели</h2>
                 <p className="font-body text-sm text-white/60 mt-0.5">Обновите цифры по хозяйству</p>
               </div>
-              <button onClick={() => setEditOpen(false)} className="text-white/60 hover:text-white">
+              <button onClick={() => setEditStatsOpen(false)} className="text-white/60 hover:text-white">
                 <Icon name="X" size={20} />
               </button>
             </div>
-
             <div className="p-6 space-y-4">
               {stats.map((s) => (
                 <div key={s.key}>
@@ -260,25 +382,102 @@ export default function FarmDashboard() {
                     value={editValues[s.key] ?? s.value}
                     onChange={e => setEditValues(prev => ({ ...prev, [s.key]: e.target.value }))}
                     className="w-full border border-border rounded-xl px-4 py-2.5 font-body text-sm focus:outline-none bg-background focus:border-farm-brown"
-                    placeholder={statMeta[s.key]?.placeholder}
                   />
                 </div>
               ))}
-
               <div className="flex gap-3 pt-2">
-                <button
-                  onClick={() => setEditOpen(false)}
-                  className="flex-1 py-3 rounded-xl font-body font-semibold text-sm border border-border hover:bg-muted transition-colors"
-                >
+                <button onClick={() => setEditStatsOpen(false)} className="flex-1 py-3 rounded-xl font-body font-semibold text-sm border border-border hover:bg-muted transition-colors">
                   Отмена
                 </button>
                 <button
-                  onClick={handleSave}
-                  disabled={saving}
+                  onClick={handleSaveStats}
+                  disabled={statsSaving}
                   className="flex-1 py-3 rounded-xl font-body font-bold text-sm bg-farm-brown text-white hover:bg-farm-earth transition-colors flex items-center justify-center gap-2 disabled:opacity-60"
                 >
-                  {saving ? <Icon name="Loader2" size={16} className="animate-spin" /> : <Icon name="Save" size={16} />}
-                  {saving ? "Сохранение..." : "Сохранить"}
+                  {statsSaving ? <Icon name="Loader2" size={16} className="animate-spin" /> : <Icon name="Save" size={16} />}
+                  {statsSaving ? "Сохранение..." : "Сохранить"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Task add/edit modal */}
+      {addOpen && (
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => { setAddOpen(false); setEditTask(null); }}>
+          <div className="bg-card rounded-3xl max-w-md w-full shadow-2xl" onClick={e => e.stopPropagation()}>
+            <div className="farm-gradient p-6 rounded-t-3xl flex items-center justify-between">
+              <div>
+                <h2 className="font-display text-xl font-bold text-white">
+                  {editTask ? "Редактировать задачу" : "Новая задача"}
+                </h2>
+                <p className="font-body text-sm text-white/60 mt-0.5">Заполните поля ниже</p>
+              </div>
+              <button onClick={() => { setAddOpen(false); setEditTask(null); }} className="text-white/60 hover:text-white">
+                <Icon name="X" size={20} />
+              </button>
+            </div>
+            <div className="p-6 space-y-4">
+              <div>
+                <label className="font-body text-sm font-semibold text-foreground mb-1.5 block">Название задачи *</label>
+                <input
+                  type="text"
+                  value={taskForm.title}
+                  onChange={e => setTaskForm(p => ({ ...p, title: e.target.value }))}
+                  placeholder="Например: Полив поля №2"
+                  className="w-full border border-border rounded-xl px-4 py-2.5 font-body text-sm focus:outline-none bg-background focus:border-farm-brown"
+                />
+              </div>
+              <div>
+                <label className="font-body text-sm font-semibold text-foreground mb-1.5 block">Ответственный</label>
+                <input
+                  type="text"
+                  value={taskForm.assignee}
+                  onChange={e => setTaskForm(p => ({ ...p, assignee: e.target.value }))}
+                  placeholder="Иванов А."
+                  className="w-full border border-border rounded-xl px-4 py-2.5 font-body text-sm focus:outline-none bg-background focus:border-farm-brown"
+                />
+              </div>
+              <div>
+                <label className="font-body text-sm font-semibold text-foreground mb-1.5 block">Срок</label>
+                <input
+                  type="text"
+                  value={taskForm.due}
+                  onChange={e => setTaskForm(p => ({ ...p, due: e.target.value }))}
+                  placeholder="Сегодня / 15 мая"
+                  className="w-full border border-border rounded-xl px-4 py-2.5 font-body text-sm focus:outline-none bg-background focus:border-farm-brown"
+                />
+              </div>
+              <div>
+                <label className="font-body text-sm font-semibold text-foreground mb-1.5 block">Приоритет</label>
+                <div className="flex gap-2">
+                  {(["high", "medium", "low"] as const).map(p => (
+                    <button
+                      key={p}
+                      onClick={() => setTaskForm(prev => ({ ...prev, priority: p }))}
+                      className={`flex-1 py-2 rounded-xl font-body text-sm font-semibold border transition-colors ${
+                        taskForm.priority === p
+                          ? priorityStyles[p] + " border-transparent"
+                          : "border-border text-muted-foreground hover:bg-muted"
+                      }`}
+                    >
+                      {priorityLabels[p]}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className="flex gap-3 pt-2">
+                <button onClick={() => { setAddOpen(false); setEditTask(null); }} className="flex-1 py-3 rounded-xl font-body font-semibold text-sm border border-border hover:bg-muted transition-colors">
+                  Отмена
+                </button>
+                <button
+                  onClick={handleSaveTask}
+                  disabled={taskSaving || !taskForm.title.trim()}
+                  className="flex-1 py-3 rounded-xl font-body font-bold text-sm bg-farm-brown text-white hover:bg-farm-earth transition-colors flex items-center justify-center gap-2 disabled:opacity-60"
+                >
+                  {taskSaving ? <Icon name="Loader2" size={16} className="animate-spin" /> : <Icon name="Save" size={16} />}
+                  {taskSaving ? "Сохранение..." : "Сохранить"}
                 </button>
               </div>
             </div>

@@ -1,0 +1,12 @@
+{
+  "tests": [
+    {
+      "name": "GET stats",
+      "method": "GET",
+      "path": "/",
+      "expectedStatus": 200,
+      "expectedBody": {"stats": [{"key": "hectares"}]},
+      "bodyMatcher": "partial"
+    }
+  ]
+}
